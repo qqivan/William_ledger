@@ -479,8 +479,7 @@ function renderList() {
 async function loadRecords() {
   document.getElementById('tx-container').innerHTML = '<div class="loading-state">載入中...</div>';
   try {
-    const res  = await fetch(apiUrl + '?action=get&t=' + Date.now());
-    const json = await res.json();
+    const json = await jsonp(apiUrl + '?action=get&t=' + Date.now());
     records = json.data || [];
     renderList();
   } catch(e) {
@@ -503,8 +502,7 @@ async function addTransaction() {
 
   try {
     const params = new URLSearchParams({ action: 'add', date, category: selectedCat, amount: Number(amount), type: currentType, note: note || '' });
-    const res  = await fetch(apiUrl + '?' + params.toString());
-    const json = await res.json();
+    const json = await jsonp(apiUrl + '?' + params.toString());
     if (json.status === 'ok') {
       records.push({ id: json.id, date, category: selectedCat, amount: Number(amount), type: currentType, note });
       document.getElementById('amount-input').value = '';
@@ -523,13 +521,23 @@ async function addTransaction() {
 async function deleteRecord(id) {
   if (!confirm('確定刪除這筆記錄？')) return;
   try {
-    const res  = await fetch(apiUrl + '?action=delete&id=' + encodeURIComponent(id));
-    const json = await res.json();
+    const json = await jsonp(apiUrl + '?action=delete&id=' + encodeURIComponent(id));
     if (json.status === 'ok') {
       records = records.filter(r => r.id !== id);
       renderList(); toast('已刪除');
     } else { toast('刪除失敗'); }
   } catch(e) { toast('網路錯誤'); }
+}
+
+function jsonp(url) {
+  return new Promise((resolve, reject) => {
+    const cb = 'jcb_' + Date.now();
+    const s  = document.createElement('script');
+    s.src    = url + '&callback=' + cb;
+    window[cb] = (data) => { delete window[cb]; s.remove(); resolve(data); };
+    s.onerror  = ()     => { delete window[cb]; s.remove(); reject(new Error('jsonp error')); };
+    document.body.appendChild(s);
+  });
 }
 
 function toast(msg) {
